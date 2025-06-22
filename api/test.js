@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   // Test Apify connection
-  const apifyToken = process.env.APIFY_API_TOKEN || 'apify_api_B0D4ojy2qKFPcaYnBkMhNGa0a3YZTF0X1RIT';
+  const apifyToken = process.env.APIFY_API_TOKEN || 'apify_api_B0D4ojy2TEj3nXYGaWJYfdZJ4VkD2NBrE';
   
   let apifyStatus = 'unknown';
   let apifyError = null;
