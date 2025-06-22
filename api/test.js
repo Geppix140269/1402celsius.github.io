@@ -1,6 +1,6 @@
 // api/test.js - Test your Apify connection
 export default async function handler(req, res) {
-  console.log('🧪 Testing Apify connection...');
+  console.log('🧪 Testing Apify connection - UPDATED...');
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
