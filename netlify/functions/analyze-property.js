@@ -231,26 +231,83 @@ function analyzeArea(location) {
 }
 
 // Check Mini PIA eligibility
+// Updated Mini PIA eligibility check with real 2024 requirements
 function checkMiniPia(property) {
   const locationLower = property.location.toLowerCase();
-  const isPuglia = locationLower.includes('puglia') || 
-                   locationLower.includes('massafra') || 
-                   locationLower.includes('alberobello');
+  const titleLower = property.title.toLowerCase();
+  
+  // Comprehensive Puglia region detection
+  const pugliaProvinces = [
+    'bari', 'bat', 'barletta', 'andria', 'trani',
+    'brindisi', 'foggia', 'lecce', 'taranto'
+  ];
+  
+  const pugliaCities = [
+    'massafra', 'alberobello', 'ostuni', 'polignano a mare',
+    'monopoli', 'castellana grotte', 'martina franca', 'locorotondo',
+    'cisternino', 'fasano', 'ceglie messapica', 'san vito dei normanni',
+    'carovigno', 'villa castelli', 'francavilla fontana', 'oria',
+    'latiano', 'mesagne', 'torchiarolo', 'cellino san marco'
+  ];
+  
+  const isPugliaRegion = locationLower.includes('puglia') || 
+                         titleLower.includes('puglia') ||
+                         pugliaProvinces.some(province => locationLower.includes(province)) ||
+                         pugliaCities.some(city => locationLower.includes(city));
 
-  const isEligiblePrice = property.price > 50000 && property.price < 2000000;
-
-  if (isPuglia && isEligiblePrice) {
-    const maxGrant = Math.min(property.price * 0.45, 200000);
+  // Mini PIA 2024 requirements
+  const minInvestment = 30000;   // €30,000 minimum investment
+  const maxInvestment = 5000000; // €5,000,000 maximum investment
+  const isEligiblePrice = property.price >= minInvestment && property.price <= maxInvestment;
+  
+  if (isPugliaRegion && isEligiblePrice) {
+    // Calculate grant amount (45% standard, up to 55% for innovative projects)
+    const standardRate = 0.45; // 45% for standard renovations
+    const innovativeRate = 0.55; // 55% for innovative/sustainable projects
+    
+    const standardAmount = property.price * standardRate;
+    const innovativeAmount = property.price * innovativeRate;
+    const maxGrant = Math.min(innovativeAmount, 2000000); // €2M maximum grant
     
     return {
       eligible: true,
-      grantType: 'Mini PIA - Puglia Development',
-      coverage: '45%',
+      grantType: 'Mini PIA Puglia 2024',
+      coverage: '45-55%',
+      standardAmount: Math.round(standardAmount),
+      innovativeAmount: Math.round(innovativeAmount),
       maxAmount: Math.round(maxGrant),
-      refundable: false
+      refundable: false,
+      requirements: [
+        'Property located in Puglia region',
+        'Minimum €30,000 investment in renovations',
+        'Energy efficiency improvements (Class B minimum)',
+        'Project completion within 24 months',
+        'Use of local contractors and materials (50%)',
+        'Seismic safety improvements where applicable'
+      ]
     };
   }
 
+  // Not eligible - provide alternatives
+  let reason = '';
+  if (!isPugliaRegion) {
+    reason = 'Property not located in Puglia region';
+  } else if (property.price < minInvestment) {
+    reason = 'Investment below €30,000 minimum threshold';
+  } else {
+    reason = 'Investment exceeds €5,000,000 maximum limit';
+  }
+
+  return {
+    eligible: false,
+    reason: reason,
+    alternatives: [
+      'Superbonus 110% (National energy efficiency)',
+      'Bonus Ristrutturazione 50% (National renovation)',
+      'Regional development programs'
+    ]
+  };
+}
   return {
     eligible: false,
     reason: 'Property not in eligible region or price range',
