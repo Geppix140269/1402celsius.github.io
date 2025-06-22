@@ -1,0 +1,18 @@
+{
+  "name": "investiscope-real-scraper",
+  "version": "1.0.0",
+  "description": "InvestiScope Pro - Real Property Scraper Backend",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required for Vercel serverless'"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
