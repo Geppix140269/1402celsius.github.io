@@ -232,6 +232,7 @@ function analyzeArea(location) {
 
 // Check Mini PIA eligibility
 // Updated Mini PIA eligibility check with real 2024 requirements
+// Updated Mini PIA eligibility check with CORRECT calculation based on total project costs
 function checkMiniPia(property) {
   const locationLower = property.location.toLowerCase();
   const titleLower = property.title.toLowerCase();
@@ -255,38 +256,114 @@ function checkMiniPia(property) {
                          pugliaProvinces.some(province => locationLower.includes(province)) ||
                          pugliaCities.some(city => locationLower.includes(city));
 
-  // Mini PIA 2024 requirements
-  const minInvestment = 30000;   // €30,000 minimum investment
-  const maxInvestment = 5000000; // €5,000,000 maximum investment
-  const isEligiblePrice = property.price >= minInvestment && property.price <= maxInvestment;
+  // Mini PIA 2024 requirements - based on total project value
+  const minProjectValue = 30000;   // €30,000 minimum total project
+  const maxProjectValue = 5000000; // €5,000,000 maximum total project
   
-  if (isPugliaRegion && isEligiblePrice) {
-    // Calculate grant amount (45% standard, up to 55% for innovative projects)
-    const standardRate = 0.45; // 45% for standard renovations
-    const innovativeRate = 0.55; // 55% for innovative/sustainable projects
+  if (isPugliaRegion && property.price > 0) {
+    // Calculate TOTAL PROJECT COSTS (like your calculator)
+    const propertyPrice = property.price;
     
-    const standardAmount = property.price * standardRate;
-    const innovativeAmount = property.price * innovativeRate;
-    const maxGrant = Math.min(innovativeAmount, 2000000); // €2M maximum grant
+    // Estimate renovation costs (typically 30-50% of property value)
+    const estimatedRenovation = propertyPrice * 0.40; // 40% estimate
     
-    return {
-      eligible: true,
-      grantType: 'Mini PIA Puglia 2024',
-      coverage: '45-55%',
-      standardAmount: Math.round(standardAmount),
-      innovativeAmount: Math.round(innovativeAmount),
-      maxAmount: Math.round(maxGrant),
-      refundable: false,
-      requirements: [
-        'Property located in Puglia region',
-        'Minimum €30,000 investment in renovations',
-        'Energy efficiency improvements (Class B minimum)',
-        'Project completion within 24 months',
-        'Use of local contractors and materials (50%)',
-        'Seismic safety improvements where applicable'
-      ]
-    };
+    // Additional costs (from your calculator logic)
+    const notaryFees = propertyPrice * 0.02;      // 2%
+    const taxes = propertyPrice * 0.09;           // 9%
+    const agencyFees = propertyPrice * 0.03;      // 3%
+    const legalFees = propertyPrice * 0.01;       // 1%
+    const hiddenCosts = notaryFees + taxes + agencyFees + legalFees;
+    
+    // Professional services
+    const projectManagement = estimatedRenovation * 0.03;  // 3% of renovation
+    const consultancy = estimatedRenovation * 0.05;        // 5% of renovation
+    const professionalServices = projectManagement + consultancy;
+    
+    // TOTAL PROJECT COSTS (the correct base for Mini PIA calculation)
+    const totalProjectCosts = propertyPrice + estimatedRenovation + hiddenCosts + professionalServices;
+    
+    // Check if total project is within Mini PIA limits
+    const isEligibleProject = totalProjectCosts >= minProjectValue && totalProjectCosts <= maxProjectValue;
+    
+    if (isEligibleProject) {
+      // Calculate grant on TOTAL PROJECT COSTS (45% standard, 55% innovative)
+      const standardRate = 0.45;   // 45% for standard projects
+      const innovativeRate = 0.55; // 55% for innovative projects
+      
+      const standardGrant = totalProjectCosts * standardRate;
+      const innovativeGrant = totalProjectCosts * innovativeRate;
+      const maxGrant = Math.min(innovativeGrant, 2000000); // €2M maximum
+      
+      // Tax credit (15% of total project costs)
+      const taxCredit = totalProjectCosts * 0.15;
+      
+      // Out-of-pocket cost (what investor actually pays)
+      const outOfPocketCost = totalProjectCosts - standardGrant;
+      
+      return {
+        eligible: true,
+        grantType: 'Mini PIA Puglia 2024',
+        coverage: '45-55%',
+        
+        // Project breakdown
+        propertyPrice: Math.round(propertyPrice),
+        estimatedRenovation: Math.round(estimatedRenovation),
+        hiddenCosts: Math.round(hiddenCosts),
+        professionalServices: Math.round(professionalServices),
+        totalProjectCosts: Math.round(totalProjectCosts),
+        
+        // Grant calculations
+        standardGrant: Math.round(standardGrant),
+        innovativeGrant: Math.round(innovativeGrant),
+        maxGrant: Math.round(maxGrant),
+        taxCredit: Math.round(taxCredit),
+        outOfPocketCost: Math.round(outOfPocketCost),
+        
+        // Additional info
+        refundable: false,
+        grantPercentage: '45%',
+        requirements: [
+          'Property located in Puglia region',
+          'Minimum €30,000 total project investment',
+          'Energy efficiency improvements (Class B minimum)',
+          'Project completion within 24 months',
+          'Use of local contractors and materials (50%)',
+          'Structural renovation works required'
+        ],
+        breakdown: {
+          property: Math.round(propertyPrice),
+          renovation: Math.round(estimatedRenovation),
+          costs: Math.round(hiddenCosts),
+          services: Math.round(professionalServices),
+          total: Math.round(totalProjectCosts),
+          grant: Math.round(standardGrant),
+          yourCost: Math.round(outOfPocketCost)
+        }
+      };
+    }
   }
+
+  // Not eligible - provide alternatives
+  let reason = '';
+  if (!isPugliaRegion) {
+    reason = 'Property not located in Puglia region';
+  } else if (property.price < 20000) {
+    reason = 'Property price too low for viable project';
+  } else {
+    reason = 'Project may exceed €5M maximum limit';
+  }
+
+  return {
+    eligible: false,
+    reason: reason,
+    alternatives: [
+      'Superbonus 110% (National energy efficiency)',
+      'Bonus Ristrutturazione 50% (National renovation)',
+      'Regional development programs'
+    ],
+    note: 'Mini PIA calculates grants on total project costs (property + renovation + fees), not just property price'
+  };
+}
 
   // Not eligible - provide alternatives
   let reason = '';
