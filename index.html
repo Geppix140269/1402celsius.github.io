@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InvestiScope™ Pro - WORKING with Your Apify Subscription</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            line-height: 1.6;
+            color: var(--gray-800);
+        }
+
+        .page-section {
+            display: none;
+            min-height: 100vh;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .hero-section h1 {
+            font-size: 36px;
+            font-weight: 900;
+            margin-bottom: 16px;
+        }
+
+        .hero-section p {
+            font-size: 18px;
+            opacity: 0.95;
+            margin-bottom: 30px;
+        }
+
+        .status-banner {
+            background: rgba(16, 185, 129, 0.2);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Search Box */
+        .search-box {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-form {
+            display: grid;
+            gap: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            font-size: 15px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .search-button {
+            padding: 18px 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .apify-status {
+            margin-top: 20px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .apify-status.connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 2px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .apify-status.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 2px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Results */
+        .results-header {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .results-header h2 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+
+        .results-count {
+            color: var(--gray-600);
+            font-size: 16px;
+        }
+
+        .property-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .property-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .property-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        }
+
+        .property-image {
+            height: 200px;
+            background: var(--gray-100);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .property-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .apify-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--success);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .property-info {
+            padding: 20px;
+        }
+
+        .property-price {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .property-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .property-location {
+            color: var(--gray-600);
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .property-features {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--gray-600);
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .contact-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .contact-btn:hover {
+            background: var(--secondary);
+        }
+
+        .loading-container {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--gray-200);
+            border-left: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .back-button {
+            background: var(--gray-100); 
+            color: var(--gray-700); 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 12px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            background: var(--gray-200);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--gray-800);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        @media (max-width: 768px) {
+            .hero-section h1 { font-size: 28px; }
+            .search-filters { grid-template-columns: 1fr; }
+            .property-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Home/Search Page -->
+    <div id="homePage" class="page-section active">
+        <div class="hero-section">
+            <div class="container">
+                <h1>InvestiScope™ Pro - WORKING System</h1>
+                <p>Real Italian properties from Idealista.com via your Apify subscription</p>
+                
+                <div class="status-banner">
+                    ✅ Using YOUR €50/month Apify subscription - No more delays!
+                </div>
+
+                <div class="search-box">
+                    <form class="search-form" onsubmit="performSearch(event)">
+                        <input type="text" 
+                               class="search-input" 
+                               id="locationInput"
+                               placeholder="Enter Italian city (e.g., massafra, roma, milano)"
+                               required>
+
+                        <div class="search-filters">
+                            <select class="filter-select" id="minPriceSelect">
+                                <option value="">Min Price</option>
+                                <option value="50000">€50,000</option>
+                                <option value="100000">€100,000</option>
+                                <option value="200000">€200,000</option>
+                                <option value="500000">€500,000</option>
+                            </select>
+
+                            <select class="filter-select" id="maxPriceSelect">
+                                <option value="">Max Price</option>
+                                <option value="200000">€200,000</option>
+                                <option value="500000">€500,000</option>
+                                <option value="1000000">€1,000,000</option>
+                                <option value="">No limit</option>
+                            </select>
+
+                            <select class="filter-select" id="propertyTypeSelect">
+                                <option value="">All Types</option>
+                                <option value="villa">Villa</option>
+                                <option value="apartment">Apartment</option>
+                                <option value="trulli">Trulli</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="search-button" id="searchBtn">
+                            🔍 Search Real Properties NOW
+                        </button>
+                    </form>
+
+                    <div id="apifyStatus" class="apify-status">
+                        Testing your Apify connection...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Page -->
+    <div id="resultsPage" class="page-section">
+        <div class="container">
+            <button class="back-button" onclick="showPage('homePage')">
+                ← New Search
+            </button>
+
+            <div class="results-header">
+                <h2>Properties in <span id="searchLocation">Italy</span></h2>
+                <div class="results-count" id="resultsCount">Loading...</div>
+            </div>
+
+            <div class="loading-container" id="loadingContainer">
+                <div class="spinner"></div>
+                <p>Searching Idealista.com via your Apify subscription...</p>
+            </div>
+
+            <div id="resultsContainer" style="display: none;">
+                <div class="property-grid" id="propertyGrid">
+                    <!-- Properties will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Your backend URL - UPDATE THIS when you deploy
+        const BACKEND_URL = 'https://your-backend.vercel.app';
+        
+        let currentProperties = [];
+        let currentSearch = {};
+
+        // Test Apify connection
+        async function testApifyConnection() {
+            const statusElement = document.getElementById('apifyStatus');
+            
+            try {
+                console.log('🧪 Testing backend connection...');
+                const response = await fetch(`${BACKEND_URL}/api/test`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Backend test result:', data);
+                    
+                    if (data.apify && data.apify.status === 'connected') {
+                        statusElement.textContent = `✅ Apify connected - Ready to search with your ${data.apify.subscription}`;
+                        statusElement.className = 'apify-status connected';
+                    } else {
+                        statusElement.textContent = `⚠️ Apify issue: ${data.apify?.error || 'Unknown error'}`;
+                        statusElement.className = 'apify-status error';
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Backend test failed:', error);
+                statusElement.textContent = '❌ Backend not deployed yet - Deploy backend first';
+                statusElement.className = 'apify-status error';
+            }
+        }
+
+        // Perform search
+        async function performSearch(event) {
+            event.preventDefault();
+            
+            const searchBtn = document.getElementById('searchBtn');
+            const location = document.getElementById('locationInput').value.trim();
+            
+            if (!location) {
+                showMessage('Please enter a location to search', 'error');
+                return;
+            }
+            
+            // Disable button
+            searchBtn.disabled = true;
+            searchBtn.textContent = '🔍 Searching Apify...';
+            
+            const minPrice = document.getElementById('minPriceSelect').value;
+            const maxPrice = document.getElementById('maxPriceSelect').value;
+            const propertyType = document.getElementById('propertyTypeSelect').value;
+
+            currentSearch = { location, minPrice, maxPrice, propertyType };
+            
+            // Update UI
+            document.getElementById('searchLocation').textContent = location;
+            
+            showPage('resultsPage');
+            document.getElementById('loadingContainer').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+
+            try {
+                console.log(`🚀 Searching for: ${location}`);
+
+                const response = await fetch(`${BACKEND_URL}/api/search-properties`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        location: location.toLowerCase(),
+                        maxItems: 50
+                    }),
+                    signal: AbortSignal.timeout(120000) // 2 minutes
+                });
+
+                console.log(`📊 Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Backend error: ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📦 Response data:', data);
+                
+                if (data.success && Array.isArray(data.data)) {
+                    let properties = data.data;
+                    
+                    // Apply filters
+                    if (minPrice) {
+                        properties = properties.filter(p => (p.price || 0) >= parseInt(minPrice));
+                    }
+                    if (maxPrice) {
+                        properties = properties.filter(p => (p.price || 0) <= parseInt(maxPrice));
+                    }
+                    if (propertyType) {
+                        properties = properties.filter(p => 
+                            p.title && p.title.toLowerCase().includes(propertyType.toLowerCase())
+                        );
+                    }
+                    
+                    currentProperties = properties;
+                    console.log(`✨ Found ${currentProperties.length} properties`);
+                    
+                    if (currentProperties.length > 0) {
+                        showMessage(`Found ${currentProperties.length} real properties from Idealista!`, 'success');
+                    } else {
+                        showMessage('No properties match your criteria. Try "massafra" or adjust filters.', 'warning');
+                    }
+                } else {
+                    throw new Error('Invalid response format');
+                }
+                
+            } catch (error) {
+                console.error('💥 Search error:', error);
+                showMessage(`Search failed: ${error.message}`, 'error');
+                currentProperties = [];
+            } finally {
+                // Re-enable button
+                searchBtn.disabled = false;
+                searchBtn.textContent = '🔍 Search Real Properties NOW';
+                
+                displayProperties();
+                document.getElementById('loadingContainer').style.display = 'none';
+                document.getElementById('resultsContainer').style.display = 'block';
+            }
+        }
+
+        // Display properties
+        function displayProperties() {
+            const grid = document.getElementById('propertyGrid');
+            const count = document.getElementById('resultsCount');
+            
+            count.textContent = `${currentProperties.length} properties found`;
+
+            if (currentProperties.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 60px;">
+                        <h3 style="font-size: 24px; color: var(--gray-800); margin-bottom: 10px;">No properties found</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 20px;">Try searching for "massafra" or adjust your filters</p>
+                        <button onclick="showPage('homePage')" 
+                                style="background: var(--primary); color: white; padding: 12px 30px; 
+                                       border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            Try Another Search
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = currentProperties.map((property, index) => `
+                <div class="property-card" onclick="contactAboutProperty(${index})">
+                    <div class="property-image">
+                        ${property.image ? 
+                            `<img src="${property.image}" alt="${property.title}" 
+                                 onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: var(--gray-100); color: var(--gray-600); font-size: 48px;\\'>🏠</div>';">` :
+                            `<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: var(--gray-100); color: var(--gray-600); font-size: 48px;">🏠</div>`
+                        }
+                        <div class="apify-badge">REAL APIFY</div>
+                    </div>
+                    <div class="property-info">
+                        <div class="property-price">€${formatNumber(property.price || 0)}</div>
+                        <div class="property-title">${property.title || 'Investment Property'}</div>
+                        <div class="property-location">📍 ${property.location || currentSearch.location}</div>
+                        <div class="property-features">
+                            ${property.rooms > 0 ? `<span>🛏️ ${property.rooms}</span>` : ''}
+                            ${property.bathrooms > 0 ? `<span>🚿 ${property.bathrooms}</span>` : ''}
+                            ${property.size > 0 ? `<span>📏 ${property.size}m²</span>` : ''}
+                        </div>
+                        <button class="contact-btn" onclick="event.stopPropagation(); contactAboutProperty(${index})">
+                            Get Investment Analysis
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add success summary
+            grid.innerHTML += `
+                <div style="grid-column: 1/-1; background: linear-gradient(135deg, var(--success) 0%, #059669 100%); 
+                            color: white; padding: 40px; border-radius: 16px; text-align: center; margin-top: 20px;">
+                    <h3 style="font-size: 24px; margin-bottom: 16px;">🎉 SUCCESS! Your Apify System is WORKING!</h3>
+                    <p style="margin-bottom: 24px; font-size: 18px;">
+                        Found ${currentProperties.length} real properties from Idealista.com using your €50/month subscription
+                    </p>
+                    <button onclick="contactForBusiness()" 
+                            style="background: white; color: var(--success); padding: 14px 32px; 
+                                   border: none; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 16px;">
+                        Start Using for Client Meetings!
+                    </button>
+                </div>
+            `;
+        }
+
+        // Contact about property
+        function contactAboutProperty(index) {
+            const property = currentProperties[index];
+            const message = `🏠 WORKING SYSTEM SUCCESS!\n\nProperty: ${property.title}\nPrice: €${formatNumber(property.price)}\nLocation: ${property.location}\n\nYour Apify system is working! Can we discuss:\n• Investment analysis for this property\n• Mini PIA grants (45% funding)\n• Using this for client presentations\n\nFrom: InvestiScope™ Pro`;
+            const whatsappUrl = `https://wa.me/393514001402?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // Contact for business use
+        function contactForBusiness() {
+            const message = `🎉 INVESTISCOPE SUCCESS!\n\n✅ Found ${currentProperties.length} real properties in ${currentSearch.location}\n✅ Your €50/month Apify subscription is working perfectly\n✅ System ready for client presentations\n\nNext steps:\n• Deploy to marietrulli.com\n• Start using with international clients\n• Implement Mini PIA grant analysis\n\nReady to take this live!`;
+            const whatsappUrl = `https://wa.me/393514001402?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // Show page
+        function showPage(pageId) {
+            document.querySelectorAll('.page-section').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // Utility functions
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US').format(Math.round(num));
+        }
+
+        function showMessage(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 InvestiScope™ Pro - WORKING with YOUR Apify subscription');
+            testApifyConnection();
+        });
+    </script>
+</body>
+</html>
