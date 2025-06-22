@@ -1,26 +1,32 @@
-// netlify/functions/analyze-property.js - WORKING Netlify Function
-const https = require('https');
-const http = require('http');
+// netlify/functions/analyze-property.js - COMPLETE WORKING VERSION WITH CORRECT MINI PIA
+const cheerio = require('cheerio');
 
 exports.handler = async (event, context) => {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Content-Type': 'application/json'
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
   };
 
-  // Handle preflight
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers };
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({})
+    };
   }
 
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ success: false, error: 'Method not allowed' })
+      body: JSON.stringify({ 
+        success: false, 
+        error: 'Method not allowed. Use POST.' 
+      })
     };
   }
 
@@ -31,353 +37,574 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success: false, error: 'URL required' })
+        body: JSON.stringify({
+          success: false,
+          error: 'Property URL is required'
+        })
       };
     }
 
-    console.log(`🏠 Scraping: ${url}`);
+    console.log(`🏠 Analyzing REAL property: ${url}`);
+
+    // Validate URL
+    if (!isValidPropertyUrl(url)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Invalid property URL. Please use Idealista.it, Immobiliare.it, or other Italian property sites.'
+        })
+      };
+    }
 
     // Scrape the property
-    const html = await fetchPage(url);
-    const propertyData = parseProperty(html, url);
+    const propertyData = await scrapeProperty(url);
     
-    // Analyze area
+    // Enhance with area analysis
     const areaAnalysis = analyzeArea(propertyData.location);
     
-    // Check Mini PIA
-    const miniPia = checkMiniPia(propertyData);
-    
-    // Calculate investment metrics
-    const investment = calculateMetrics(propertyData, areaAnalysis);
+    // Check Mini PIA eligibility with CORRECT calculation
+    const miniPiaAnalysis = checkMiniPia(propertyData);
 
-    const result = {
+    // Combine all data
+    const analysis = {
       success: true,
       property: propertyData,
       area: areaAnalysis,
-      miniPia: miniPia,
-      investment: investment,
+      miniPia: miniPiaAnalysis,
+      investment: calculateInvestmentMetrics(propertyData, areaAnalysis),
       timestamp: new Date().toISOString()
     };
+
+    console.log(`✅ Analysis complete for ${propertyData.title}`);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(result)
+      body: JSON.stringify(analysis)
     };
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Property analysis error:', error);
     
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
-        error: error.message,
+        error: 'Failed to analyze property',
+        details: error.message,
         timestamp: new Date().toISOString()
       })
     };
   }
 };
 
-// Fetch page content
-function fetchPage(url) {
-  return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
-    
-    const options = {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive'
-      }
-    };
-
-    const req = protocol.get(url, options, (res) => {
-      let data = '';
-      
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
-      res.on('end', () => {
-        resolve(data);
-      });
-    });
-
-    req.on('error', (error) => {
-      reject(error);
-    });
-
-    req.setTimeout(30000, () => {
-      req.abort();
-      reject(new Error('Request timeout'));
-    });
-  });
+// Validate property URL
+function isValidPropertyUrl(url) {
+  const validDomains = [
+    'idealista.it',
+    'immobiliare.it',
+    'casa.it',
+    'tecnocasa.it',
+    'remax.it',
+    'gate-away.com',
+    'subito.it'
+  ];
+  
+  return validDomains.some(domain => url.includes(domain));
 }
 
-// Parse property from HTML
-function parseProperty(html, url) {
-  console.log('📄 Parsing property data...');
+// Main scraping function
+async function scrapeProperty(url) {
+  try {
+    console.log(`🔍 Fetching property page: ${url}`);
 
-  // Extract title
-  let title = 'Property in Italy';
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleMatch) {
-    title = titleMatch[1].replace(/[^\w\s€-]/g, ' ').trim();
-  }
-
-  // Extract price
-  let price = 0;
-  const pricePatterns = [
-    /[€][\s]*([0-9.,]+)/g,
-    /prezzo[^0-9]*([0-9.,]+)/gi,
-    /price[^0-9]*([0-9.,]+)/gi
-  ];
-
-  for (const pattern of pricePatterns) {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      const priceStr = match[1].replace(/[.,\s]/g, '');
-      const numPrice = parseInt(priceStr);
-      if (numPrice > 10000 && numPrice < 10000000) {
-        price = numPrice;
-        break;
+    // Fetch the property page
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
       }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    if (price > 0) break;
-  }
 
-  // Extract location
-  let location = 'Italy';
-  const locationPatterns = [
-    /([A-Z][a-z]+)\s*,\s*([A-Z][a-z]+)/g,
-    /(Massafra|Alberobello|Roma|Milano|Firenze|Puglia|Toscana|Sicilia)/gi
-  ];
+    const html = await response.text();
+    const $ = cheerio.load(html);
 
-  for (const pattern of locationPatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      location = match[0];
-      break;
+    console.log(`📄 Page fetched, parsing content...`);
+
+    // Determine site type and scrape accordingly
+    if (url.includes('idealista.it')) {
+      return scrapeIdealista($, url);
+    } else if (url.includes('immobiliare.it')) {
+      return scrapeImmobiliare($, url);
+    } else {
+      return scrapeGeneric($, url);
     }
-  }
 
-  // Extract features
-  let rooms = 0;
-  let size = 0;
-
-  const roomMatch = html.match(/([0-9]+)\s*(camera|camere|room|bedroom)/gi);
-  if (roomMatch) {
-    rooms = parseInt(roomMatch[0]);
+  } catch (error) {
+    console.error('❌ Scraping failed:', error);
+    throw new Error(`Failed to scrape property: ${error.message}`);
   }
+}
 
-  const sizeMatch = html.match(/([0-9]+)\s*m[²2]/gi);
-  if (sizeMatch) {
-    const sizeStr = sizeMatch[0].replace(/[m²2\s]/g, '');
-    size = parseInt(sizeStr);
-  }
+// Idealista.it scraper
+function scrapeIdealista($, url) {
+  console.log('🏠 Parsing Idealista.it property...');
+
+  const title = $('h1.main-info__title-main').text().trim() || 
+                $('h1').first().text().trim() || 
+                'Property in Italy';
+
+  const priceText = $('.info-data-price').text() || 
+                    $('.price').text() || 
+                    $('[class*="price"]').first().text() || '';
+  
+  const price = extractPrice(priceText);
+
+  const location = $('.main-info__title-minor').text().trim() || 
+                   extractLocationFromTitle(title) || 
+                   'Italy';
+
+  const features = extractFeatures($);
+  
+  const description = $('.comment').text().trim() || 
+                      $('[class*="description"]').first().text().trim() || 
+                      '';
+
+  const images = extractImages($);
 
   return {
-    title: title,
-    price: price,
-    location: location,
-    rooms: rooms || Math.floor(Math.random() * 4) + 1,
-    bathrooms: Math.ceil(rooms / 2) || 1,
-    size: size || Math.floor(Math.random() * 100) + 80,
-    url: url,
+    title,
+    price,
+    location,
+    rooms: features.rooms,
+    bathrooms: features.bathrooms,
+    size: features.size,
+    description,
+    images,
+    url,
+    source: 'idealista.it'
+  };
+}
+
+// Immobiliare.it scraper
+function scrapeImmobiliare($, url) {
+  console.log('🏠 Parsing Immobiliare.it property...');
+
+  const title = $('h1').first().text().trim() || 'Property in Italy';
+  
+  const priceText = $('[class*="price"]').first().text() || '';
+  const price = extractPrice(priceText);
+
+  const location = $('[class*="location"]').first().text().trim() || 
+                   extractLocationFromTitle(title) || 
+                   'Italy';
+
+  const features = extractFeatures($);
+  
+  const description = $('[class*="description"]').first().text().trim() || '';
+  const images = extractImages($);
+
+  return {
+    title,
+    price,
+    location,
+    rooms: features.rooms,
+    bathrooms: features.bathrooms,
+    size: features.size,
+    description,
+    images,
+    url,
+    source: 'immobiliare.it'
+  };
+}
+
+// Generic scraper for other sites
+function scrapeGeneric($, url) {
+  console.log('🏠 Parsing generic property site...');
+
+  const title = $('h1').first().text().trim() || 
+                $('title').text().trim() || 
+                'Property in Italy';
+
+  // Try multiple price selectors
+  const priceSelectors = [
+    '[class*="price"]',
+    '[class*="prezzo"]',
+    '[id*="price"]',
+    '[data-price]'
+  ];
+
+  let priceText = '';
+  for (const selector of priceSelectors) {
+    priceText = $(selector).first().text();
+    if (priceText) break;
+  }
+
+  const price = extractPrice(priceText);
+  const location = extractLocationFromTitle(title) || 'Italy';
+  const features = extractFeatures($);
+  const description = $('p').first().text().trim() || '';
+  const images = extractImages($);
+
+  return {
+    title,
+    price,
+    location,
+    rooms: features.rooms,
+    bathrooms: features.bathrooms,
+    size: features.size,
+    description,
+    images,
+    url,
     source: new URL(url).hostname
   };
 }
 
-// Analyze area
-function analyzeArea(location) {
-  const locationLower = location.toLowerCase();
-
-  let touristAppeal = 'Traditional Italian Culture';
-  let marketTrend = '+6.8% annually';
-  let rentalPotential = '€100-200/night';
-  let investmentGrade = 'Grade B+';
-
-  if (locationLower.includes('alberobello')) {
-    touristAppeal = 'UNESCO World Heritage Site';
-    marketTrend = '+12.5% annually';
-    rentalPotential = '€150-280/night';
-    investmentGrade = 'Grade A+';
-  } else if (locationLower.includes('massafra')) {
-    touristAppeal = 'Historical Ravines & Rupestrian Churches';
-    marketTrend = '+8.5% annually';
-    rentalPotential = '€80-150/night';
-    investmentGrade = 'Grade A';
-  } else if (locationLower.includes('roma')) {
-    touristAppeal = 'Ancient Rome & Vatican';
-    marketTrend = '+5.2% annually';
-    rentalPotential = '€200-450/night';
-    investmentGrade = 'Grade A+';
-  } else if (locationLower.includes('puglia')) {
-    touristAppeal = 'Authentic Italian Experience';
-    marketTrend = '+9.2% annually';
-    rentalPotential = '€90-180/night';
-    investmentGrade = 'Grade A';
+// Helper functions
+function extractPrice(priceText) {
+  if (!priceText) return 0;
+  
+  // Remove currency symbols and extract numbers
+  const cleanPrice = priceText.replace(/[€$£,.\s]/g, '');
+  const match = cleanPrice.match(/\d+/);
+  
+  if (match) {
+    let price = parseInt(match[0]);
+    
+    // Handle thousands/millions
+    if (priceText.toLowerCase().includes('milion') || priceText.includes('M')) {
+      price = price * 1000000;
+    } else if (priceText.toLowerCase().includes('k') || price < 1000) {
+      price = price * 1000;
+    }
+    
+    return price;
   }
-
-  return {
-    touristAppeal,
-    marketTrend,
-    rentalPotential,
-    investmentGrade
-  };
+  
+  return 0;
 }
 
-// Check Mini PIA eligibility
-// Updated Mini PIA eligibility check with real 2024 requirements
-// Updated Mini PIA eligibility check with CORRECT calculation based on total project costs
+function extractLocationFromTitle(title) {
+  // Common Italian city patterns
+  const cityPatterns = [
+    /in\s+([A-Z][a-z]+)/g,
+    /,\s*([A-Z][a-z]+)/g,
+    /-\s*([A-Z][a-z]+)/g
+  ];
+
+  for (const pattern of cityPatterns) {
+    const match = title.match(pattern);
+    if (match) {
+      return match[1] || match[0].replace(/[in,\-\s]/g, '');
+    }
+  }
+
+  // Italian regions
+  const regions = ['Puglia', 'Toscana', 'Sicilia', 'Campania', 'Lazio', 'Calabria'];
+  for (const region of regions) {
+    if (title.includes(region)) {
+      return region;
+    }
+  }
+
+  return 'Italy';
+}
+
+function extractFeatures($) {
+  let rooms = 0;
+  let bathrooms = 0;
+  let size = 0;
+
+  // Common feature selectors
+  const featureSelectors = [
+    '[class*="feature"]',
+    '[class*="detail"]',
+    '[class*="info"]',
+    'li',
+    'span'
+  ];
+
+  for (const selector of featureSelectors) {
+    $(selector).each((i, elem) => {
+      const text = $(elem).text().toLowerCase();
+      
+      // Extract rooms
+      const roomMatch = text.match(/(\d+)\s*(camera|room|bedroom)/);
+      if (roomMatch && !rooms) {
+        rooms = parseInt(roomMatch[1]);
+      }
+
+      // Extract bathrooms
+      const bathMatch = text.match(/(\d+)\s*(bagno|bathroom|bath)/);
+      if (bathMatch && !bathrooms) {
+        bathrooms = parseInt(bathMatch[1]);
+      }
+
+      // Extract size
+      const sizeMatch = text.match(/(\d+)\s*m[²2]/);
+      if (sizeMatch && !size) {
+        size = parseInt(sizeMatch[1]);
+      }
+    });
+  }
+
+  return { rooms, bathrooms, size };
+}
+
+function extractImages($) {
+  const images = [];
+  
+  // Common image selectors
+  $('img').each((i, elem) => {
+    const src = $(elem).attr('src') || $(elem).attr('data-src');
+    if (src && !src.includes('icon') && !src.includes('logo')) {
+      if (src.startsWith('http') || src.startsWith('//')) {
+        images.push(src);
+      }
+    }
+  });
+
+  return images.slice(0, 5); // Limit to 5 images
+}
+
+// Area analysis
+function analyzeArea(location) {
+  console.log(`📍 Analyzing area: ${location}`);
+
+  const areaData = {
+    touristAppeal: getTouristAppeal(location),
+    marketTrend: getMarketTrend(location),
+    rentalPotential: getRentalPotential(location),
+    investmentGrade: getInvestmentGrade(location),
+    averagePrice: getAveragePrice(location),
+    priceGrowth: getPriceGrowth(location)
+  };
+
+  return areaData;
+}
+
+function getTouristAppeal(location) {
+  const touristAreas = {
+    'alberobello': 'UNESCO World Heritage Site',
+    'massafra': 'Historical Ravines & Rupestrian Churches',
+    'roma': 'Ancient Rome & Vatican',
+    'firenze': 'Renaissance Art Capital',
+    'venezia': 'Unique Canal City',
+    'amalfi': 'Coastal Paradise',
+    'positano': 'Dramatic Cliffside Beauty',
+    'taormina': 'Mount Etna Views',
+    'cinque terre': 'UNESCO Coastal Villages'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [city, appeal] of Object.entries(touristAreas)) {
+    if (locationLower.includes(city)) {
+      return appeal;
+    }
+  }
+
+  if (locationLower.includes('puglia')) return 'Authentic Italian Experience';
+  if (locationLower.includes('toscana')) return 'Wine Country & Hills';
+  if (locationLower.includes('sicilia')) return 'Mediterranean Island Paradise';
+
+  return 'Traditional Italian Culture';
+}
+
+function getMarketTrend(location) {
+  const trends = {
+    'alberobello': '+12.5%',
+    'massafra': '+8.5%',
+    'roma': '+5.2%',
+    'milano': '+7.8%',
+    'firenze': '+6.4%',
+    'puglia': '+9.2%',
+    'toscana': '+4.8%',
+    'sicilia': '+11.3%'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [area, trend] of Object.entries(trends)) {
+    if (locationLower.includes(area)) {
+      return trend + ' annually';
+    }
+  }
+
+  return '+6.8% annually';
+}
+
+function getRentalPotential(location) {
+  const rentals = {
+    'alberobello': '€150-280/night',
+    'massafra': '€80-150/night',
+    'roma': '€200-450/night',
+    'firenze': '€180-350/night',
+    'amalfi': '€300-600/night',
+    'puglia': '€90-180/night',
+    'toscana': '€120-250/night'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [area, rental] of Object.entries(rentals)) {
+    if (locationLower.includes(area)) {
+      return rental;
+    }
+  }
+
+  return '€100-200/night';
+}
+
+function getInvestmentGrade(location) {
+  const grades = {
+    'alberobello': 'Grade A+',
+    'massafra': 'Grade A',
+    'roma': 'Grade A+',
+    'amalfi': 'Grade A+',
+    'puglia': 'Grade A',
+    'toscana': 'Grade A'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [area, grade] of Object.entries(grades)) {
+    if (locationLower.includes(area)) {
+      return grade;
+    }
+  }
+
+  return 'Grade B+';
+}
+
+function getAveragePrice(location) {
+  const prices = {
+    'massafra': '€1,200/m²',
+    'alberobello': '€2,800/m²',
+    'roma': '€4,500/m²',
+    'milano': '€5,200/m²',
+    'puglia': '€1,500/m²',
+    'toscana': '€3,200/m²'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [area, price] of Object.entries(prices)) {
+    if (locationLower.includes(area)) {
+      return price;
+    }
+  }
+
+  return '€2,000/m²';
+}
+
+function getPriceGrowth(location) {
+  const growth = {
+    'alberobello': '+45%',
+    'massafra': '+38%',
+    'puglia': '+42%',
+    'toscana': '+25%',
+    'sicilia': '+48%'
+  };
+
+  const locationLower = location.toLowerCase();
+  for (const [area, percent] of Object.entries(growth)) {
+    if (locationLower.includes(area)) {
+      return percent + ' (5-year outlook)';
+    }
+  }
+
+  return '+35% (5-year outlook)';
+}
+
+// CORRECTED Mini PIA calculation based on TOTAL PROJECT COSTS
 function checkMiniPia(property) {
   const locationLower = property.location.toLowerCase();
   const titleLower = property.title.toLowerCase();
   
-  // Comprehensive Puglia region detection
-  const pugliaProvinces = [
-    'bari', 'bat', 'barletta', 'andria', 'trani',
-    'brindisi', 'foggia', 'lecce', 'taranto'
-  ];
+  // Check if property is in Puglia region
+  const pugliaCities = ['massafra', 'alberobello', 'ostuni', 'polignano', 'monopoli', 'martina franca', 'locorotondo', 'cisternino', 'fasano'];
+  const pugliaProvinces = ['bari', 'brindisi', 'foggia', 'lecce', 'taranto'];
   
-  const pugliaCities = [
-    'massafra', 'alberobello', 'ostuni', 'polignano a mare',
-    'monopoli', 'castellana grotte', 'martina franca', 'locorotondo',
-    'cisternino', 'fasano', 'ceglie messapica', 'san vito dei normanni',
-    'carovigno', 'villa castelli', 'francavilla fontana', 'oria',
-    'latiano', 'mesagne', 'torchiarolo', 'cellino san marco'
-  ];
-  
-  const isPugliaRegion = locationLower.includes('puglia') || 
-                         titleLower.includes('puglia') ||
-                         pugliaProvinces.some(province => locationLower.includes(province)) ||
-                         pugliaCities.some(city => locationLower.includes(city));
+  const isPuglia = locationLower.includes('puglia') || 
+                   titleLower.includes('puglia') ||
+                   pugliaCities.some(city => locationLower.includes(city)) ||
+                   pugliaProvinces.some(province => locationLower.includes(province));
 
-  // Mini PIA 2024 requirements - based on total project value
-  const minProjectValue = 30000;   // €30,000 minimum total project
-  const maxProjectValue = 5000000; // €5,000,000 maximum total project
-  
-  if (isPugliaRegion && property.price > 0) {
-    // Calculate TOTAL PROJECT COSTS (like your calculator)
+  if (isPuglia && property.price > 0) {
+    // Calculate TOTAL PROJECT COSTS (following your calculator logic)
     const propertyPrice = property.price;
     
-    // Estimate renovation costs (typically 30-50% of property value)
-    const estimatedRenovation = propertyPrice * 0.40; // 40% estimate
+    // Estimate renovation costs (40% of property value)
+    const renovationCosts = propertyPrice * 0.40;
     
-    // Additional costs (from your calculator logic)
-    const notaryFees = propertyPrice * 0.02;      // 2%
-    const taxes = propertyPrice * 0.09;           // 9%
-    const agencyFees = propertyPrice * 0.03;      // 3%
-    const legalFees = propertyPrice * 0.01;       // 1%
+    // Calculate hidden costs (15% of property price)
+    const notaryFees = propertyPrice * 0.02;    // 2%
+    const taxes = propertyPrice * 0.09;         // 9%
+    const agencyFees = propertyPrice * 0.03;    // 3%
+    const legalFees = propertyPrice * 0.01;     // 1%
     const hiddenCosts = notaryFees + taxes + agencyFees + legalFees;
     
-    // Professional services
-    const projectManagement = estimatedRenovation * 0.03;  // 3% of renovation
-    const consultancy = estimatedRenovation * 0.05;        // 5% of renovation
+    // Professional services (8% of renovation costs)
+    const projectManagement = renovationCosts * 0.03;  // 3%
+    const consultancy = renovationCosts * 0.05;        // 5%
     const professionalServices = projectManagement + consultancy;
     
-    // TOTAL PROJECT COSTS (the correct base for Mini PIA calculation)
-    const totalProjectCosts = propertyPrice + estimatedRenovation + hiddenCosts + professionalServices;
+    // TOTAL PROJECT COSTS
+    const totalProjectCosts = propertyPrice + renovationCosts + hiddenCosts + professionalServices;
     
-    // Check if total project is within Mini PIA limits
-    const isEligibleProject = totalProjectCosts >= minProjectValue && totalProjectCosts <= maxProjectValue;
+    // Mini PIA grant calculation (45% of total project costs)
+    const grantRate = 0.45;
+    const miniPiaGrant = totalProjectCosts * grantRate;
+    const maxGrant = Math.min(miniPiaGrant, 2000000); // €2M maximum
     
-    if (isEligibleProject) {
-      // Calculate grant on TOTAL PROJECT COSTS (45% standard, 55% innovative)
-      const standardRate = 0.45;   // 45% for standard projects
-      const innovativeRate = 0.55; // 55% for innovative projects
-      
-      const standardGrant = totalProjectCosts * standardRate;
-      const innovativeGrant = totalProjectCosts * innovativeRate;
-      const maxGrant = Math.min(innovativeGrant, 2000000); // €2M maximum
-      
-      // Tax credit (15% of total project costs)
-      const taxCredit = totalProjectCosts * 0.15;
-      
-      // Out-of-pocket cost (what investor actually pays)
-      const outOfPocketCost = totalProjectCosts - standardGrant;
-      
+    // Out-of-pocket cost
+    const outOfPocketCost = totalProjectCosts - miniPiaGrant;
+    
+    // Tax credit (15% of total project)
+    const taxCredit = totalProjectCosts * 0.15;
+
+    if (totalProjectCosts >= 30000 && totalProjectCosts <= 5000000) {
       return {
         eligible: true,
         grantType: 'Mini PIA Puglia 2024',
-        coverage: '45-55%',
+        coverage: '45%',
         
-        // Project breakdown
+        // Breakdown
         propertyPrice: Math.round(propertyPrice),
-        estimatedRenovation: Math.round(estimatedRenovation),
+        renovationCosts: Math.round(renovationCosts),
         hiddenCosts: Math.round(hiddenCosts),
         professionalServices: Math.round(professionalServices),
         totalProjectCosts: Math.round(totalProjectCosts),
         
-        // Grant calculations
-        standardGrant: Math.round(standardGrant),
-        innovativeGrant: Math.round(innovativeGrant),
-        maxGrant: Math.round(maxGrant),
-        taxCredit: Math.round(taxCredit),
+        // Grant details
+        miniPiaGrant: Math.round(miniPiaGrant),
+        maxAmount: Math.round(maxGrant),
         outOfPocketCost: Math.round(outOfPocketCost),
+        taxCredit: Math.round(taxCredit),
         
-        // Additional info
         refundable: false,
-        grantPercentage: '45%',
         requirements: [
           'Property located in Puglia region',
           'Minimum €30,000 total project investment',
-          'Energy efficiency improvements (Class B minimum)',
+          'Energy efficiency improvements required',
           'Project completion within 24 months',
-          'Use of local contractors and materials (50%)',
+          'Use of local contractors (50%)',
           'Structural renovation works required'
-        ],
-        breakdown: {
-          property: Math.round(propertyPrice),
-          renovation: Math.round(estimatedRenovation),
-          costs: Math.round(hiddenCosts),
-          services: Math.round(professionalServices),
-          total: Math.round(totalProjectCosts),
-          grant: Math.round(standardGrant),
-          yourCost: Math.round(outOfPocketCost)
-        }
+        ]
       };
     }
   }
 
-  // Not eligible - provide alternatives
-  let reason = '';
-  if (!isPugliaRegion) {
-    reason = 'Property not located in Puglia region';
-  } else if (property.price < 20000) {
-    reason = 'Property price too low for viable project';
-  } else {
-    reason = 'Project may exceed €5M maximum limit';
-  }
-
   return {
     eligible: false,
-    reason: reason,
-    alternatives: [
-      'Superbonus 110% (National energy efficiency)',
-      'Bonus Ristrutturazione 50% (National renovation)',
-      'Regional development programs'
-    ],
-    note: 'Mini PIA calculates grants on total project costs (property + renovation + fees), not just property price'
-  };
-}
-
-  // Not eligible - provide alternatives
-  let reason = '';
-  if (!isPugliaRegion) {
-    reason = 'Property not located in Puglia region';
-  } else if (property.price < minInvestment) {
-    reason = 'Investment below €30,000 minimum threshold';
-  } else {
-    reason = 'Investment exceeds €5,000,000 maximum limit';
-  }
-
-  return {
-    eligible: false,
-    reason: reason,
+    reason: isPuglia ? 'Project value outside €30k-€5M range' : 'Property not in Puglia region',
     alternatives: [
       'Superbonus 110% (National energy efficiency)',
       'Bonus Ristrutturazione 50% (National renovation)',
@@ -385,37 +612,26 @@ function checkMiniPia(property) {
     ]
   };
 }
-  return {
-    eligible: false,
-    reason: 'Property not in eligible region or price range',
-    alternatives: [
-      'Superbonus 110% (Energy efficiency)',
-      'Bonus Casa (General renovations)',
-      'Regional development grants'
-    ]
-  };
-}
 
-// Calculate investment metrics
-function calculateMetrics(property, area) {
+// Investment metrics calculation
+function calculateInvestmentMetrics(property, area) {
   const price = property.price || 0;
   const size = property.size || 100;
-  const pricePerSqm = size > 0 ? Math.round(price / size) : 0;
+  const pricePerSqm = size > 0 ? price / size : 0;
 
-  // Extract rental rates
+  // Extract numbers from rental potential
   const rentalMatch = area.rentalPotential.match(/€(\d+)-(\d+)/);
-  const avgRate = rentalMatch ? 
-    (parseInt(rentalMatch[1]) + parseInt(rentalMatch[2])) / 2 : 150;
-
-  const annualRental = Math.round(avgRate * 365 * 0.6); // 60% occupancy
+  const avgNightlyRate = rentalMatch ? (parseInt(rentalMatch[1]) + parseInt(rentalMatch[2])) / 2 : 0;
+  
+  // Estimate annual rental income (assuming 60% occupancy)
+  const annualRental = avgNightlyRate * 365 * 0.6;
   const yieldRate = price > 0 ? (annualRental / price) * 100 : 0;
 
   return {
-    pricePerSqm,
+    pricePerSqm: Math.round(pricePerSqm),
     estimatedYield: Math.round(yieldRate * 10) / 10 + '%',
-    annualRental,
+    annualRental: Math.round(annualRental),
     breakEvenYears: yieldRate > 0 ? Math.round(100 / yieldRate) : 0,
-    marketPosition: pricePerSqm < 2000 ? 'Below Market' : 
-                   pricePerSqm < 3000 ? 'Market Rate' : 'Premium'
+    marketPosition: pricePerSqm < 2000 ? 'Below Market' : pricePerSqm < 3000 ? 'Market Rate' : 'Premium'
   };
 }
