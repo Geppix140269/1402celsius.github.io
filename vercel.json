@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "functions": {
+    "api/analyze-property.js": {
+      "maxDuration": 60
+    },
+    "api/test.js": {
+      "maxDuration": 10
+    }
+  },
+  "builds": [
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    }
+  ]
+}
