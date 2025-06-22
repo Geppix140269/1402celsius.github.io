@@ -683,7 +683,7 @@
 
             try {
                 // Call REAL backend scraper
-                const response = await fetch('/api/analyze-property', {
+                const response = await fetch('/.netlify/functions/analyze-property', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
